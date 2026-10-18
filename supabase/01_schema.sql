@@ -57,12 +57,16 @@ alter table public.app_admins enable row level security;
 insert into public.app_admins (email) values ('akshay@samosainteractive.com')
 on conflict do nothing;
 
+-- Admin = signed in with an address on the list that Supabase has confirmed
+-- the user owns (so an unconfirmed sign-up with an admin's email gets nothing).
 create or replace function public.is_admin()
 returns boolean language sql stable security definer
-set search_path = public as $$
+set search_path = public, auth as $$
   select exists (
-    select 1 from app_admins
-     where lower(email) = lower(coalesce(auth.jwt() ->> 'email', ''))
+    select 1 from app_admins a
+      join auth.users u on lower(u.email) = lower(a.email)
+     where u.id = auth.uid()
+       and u.email_confirmed_at is not null
   )
 $$;
 

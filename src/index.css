@@ -150,6 +150,9 @@
 .animate-spin-slow {
   animation: spin-slow 90s linear infinite;
 }
+.disc {
+  animation: spin-slow 3.6s linear infinite;
+}
 .animate-spin-slower-rev {
   animation: spin-slow 140s linear infinite reverse;
 }

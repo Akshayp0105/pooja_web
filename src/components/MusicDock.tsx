@@ -20,6 +20,35 @@ export function Bars({ active, className }: { active: boolean; className?: strin
   );
 }
 
+/** A small vinyl record that spins while a chant plays. */
+function Disc({ spinning, size = 44 }: { spinning: boolean; size?: number }) {
+  return (
+    <span className="relative block shrink-0" style={{ width: size, height: size }} aria-hidden>
+      <span
+        className="disc absolute inset-0 overflow-hidden rounded-full shadow-[0_4px_14px_-4px_rgba(42,26,18,.55)]"
+        style={{
+          animationPlayState: spinning ? 'running' : 'paused',
+          background:
+            'radial-gradient(circle at 50% 50%, #F3A53A 0 17%, #6A1F1B 17.5% 21%, transparent 21.5%),' +
+            'repeating-radial-gradient(circle at 50% 50%, #2A1A12 0 1.2px, #3B241A 1.2px 2.4px)',
+        }}
+      >
+        {/* sheen makes the rotation visible */}
+        <span className="absolute inset-0 rounded-full bg-[conic-gradient(from_20deg,transparent_0_15%,rgba(255,255,255,.24)_22%,transparent_32%_62%,rgba(255,255,255,.15)_70%,transparent_80%)]" />
+        <span className="absolute left-1/2 top-1/2 h-[8%] w-[8%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-ivory" />
+      </span>
+      {/* tone arm swings onto the record while playing */}
+      <motion.span
+        className="absolute -right-[2px] -top-[4px] h-[58%] w-[3px] origin-top rounded-full bg-gradient-to-b from-gold-soft to-gold"
+        animate={{ rotate: spinning ? 30 : 4 }}
+        transition={{ type: 'spring', stiffness: 120, damping: 14 }}
+      >
+        <span className="absolute -left-[2px] -top-[2px] h-[7px] w-[7px] rounded-full bg-gold-deep" />
+      </motion.span>
+    </span>
+  );
+}
+
 export function MusicDock() {
   const a = useAudio();
   const [open, setOpen] = useState(false);
@@ -37,33 +66,35 @@ export function MusicDock() {
   return (
     <motion.div
       ref={panel}
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 1.2, duration: 0.8 }}
-      className="fixed bottom-[max(16px,env(safe-area-inset-bottom))] left-4 z-50 sm:left-6"
+      initial={{ opacity: 0, y: 24, scale: 0.9 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ delay: 1.2, type: 'spring', stiffness: 220, damping: 22 }}
+      className="fixed bottom-[max(16px,env(safe-area-inset-bottom))] right-4 z-50 sm:bottom-6 sm:right-6"
     >
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: 10, scale: 0.97 }}
+            initial={{ opacity: 0, y: 12, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 10, scale: 0.97 }}
-            transition={{ duration: 0.25 }}
-            className="absolute bottom-[calc(100%+10px)] left-0 w-[min(92vw,360px)] origin-bottom-left overflow-hidden rounded-3xl border border-gold/20 bg-white/90 shadow-lift backdrop-blur-xl"
+            exit={{ opacity: 0, y: 12, scale: 0.96 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+            className="absolute bottom-[calc(100%+12px)] right-0 w-[min(92vw,360px)] origin-bottom-right overflow-hidden rounded-[24px] border border-gold/20 bg-white/95 shadow-lift backdrop-blur-xl"
           >
-            <div className="flex items-center justify-between px-5 pb-2 pt-4">
-              <p className="text-[13px] font-semibold text-maroon">
-                Chants <span className="font-ml normal-case tracking-normal text-saffron">· മന്ത്രങ്ങൾ</span>
-              </p>
+            <div className="flex items-center gap-3 border-b border-gold/10 px-5 py-4">
+              <Disc spinning={a.playing} size={52} />
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-semibold text-ink">{a.track.title}</p>
+                <p className="truncate font-mlsans text-[12.5px] text-saffron">{a.track.ml}</p>
+              </div>
               <button onClick={() => setOpen(false)} className="rounded-full p-1.5 text-muted hover:bg-parchment" aria-label="Close">
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <ul className="max-h-[50vh] overflow-y-auto px-2 pb-2">
-              {TRACKS.map((t) => {
+            <ul className="max-h-[46vh] overflow-y-auto p-2">
+              {TRACKS.map((t, i) => {
                 const current = t.id === a.track.id;
                 return (
-                  <li key={t.id}>
+                  <motion.li key={t.id} initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.03 }}>
                     <button
                       onClick={() => (current ? a.toggle() : a.play(t.id))}
                       className={cn(
@@ -73,18 +104,22 @@ export function MusicDock() {
                     >
                       <span
                         className={cn(
-                          'flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+                          'flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition',
                           current ? 'bg-saffron text-white' : 'bg-parchment text-maroon',
                         )}
                       >
-                        {current && a.playing ? <Bars active className="!h-3.5 [&>span]:!from-white [&>span]:!to-white" /> : <Play className="ml-0.5 h-3.5 w-3.5" />}
+                        {current && a.playing ? (
+                          <Bars active className="!h-3.5 [&>span]:!from-white [&>span]:!to-white" />
+                        ) : (
+                          <Play className="ml-0.5 h-3.5 w-3.5" />
+                        )}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-[14px] font-semibold text-ink">{t.title}</span>
                         <span className="block truncate font-mlsans text-[12px] text-muted">{t.ml}</span>
                       </span>
                     </button>
-                  </li>
+                  </motion.li>
                 );
               })}
             </ul>
@@ -102,7 +137,7 @@ export function MusicDock() {
               />
             </div>
             <p className="border-t border-gold/10 px-5 py-2.5 text-[11px] leading-snug text-muted/80">
-              Now: {a.track.artist} ·{' '}
+              {a.track.artist} ·{' '}
               <a href={a.track.page} target="_blank" rel="noreferrer" className="underline decoration-gold/40 underline-offset-2">
                 {a.track.license}
               </a>
@@ -111,31 +146,58 @@ export function MusicDock() {
         )}
       </AnimatePresence>
 
-      <div className="flex items-center gap-1 rounded-full border border-gold/20 bg-white/85 p-1.5 shadow-soft backdrop-blur-xl">
+      <div className="flex items-center gap-1 rounded-full border border-gold/20 bg-white/85 p-1.5 pr-2 shadow-soft backdrop-blur-xl">
         <button
           onClick={a.toggle}
-          className={cn(
-            'relative flex h-10 w-10 items-center justify-center rounded-full text-white transition',
-            'bg-gradient-to-br from-[#E8892A] to-[#C75D17] shadow-glow hover:scale-105',
-          )}
+          className="group relative rounded-full transition-transform hover:scale-105 active:scale-95"
           aria-label={a.playing ? 'Pause chant' : 'Play chant'}
         >
           {a.waiting && <span className="animate-ripple absolute inset-0 rounded-full border-2 border-saffron" />}
-          {a.playing ? <Pause className="h-4 w-4" /> : <Play className="ml-0.5 h-4 w-4" />}
-        </button>
-        <button onClick={() => setOpen((v) => !v)} className="flex min-w-0 items-center gap-2.5 rounded-full py-1 pl-2 pr-3 text-left hover:bg-parchment/60">
-          <Bars active={a.playing} />
-          <span className="hidden min-w-0 max-w-[200px] min-[420px]:block">
-            <span className="block truncate text-[12.5px] font-semibold leading-tight text-ink">
-              {a.waiting ? 'Tap anywhere for chants' : a.track.title}
-            </span>
-            <span className="block truncate font-mlsans text-[11px] leading-tight text-muted">{a.track.ml}</span>
+          <Disc spinning={a.playing} />
+          <span
+            className={cn(
+              'absolute inset-0 flex items-center justify-center rounded-full bg-ink/35 text-white transition-opacity',
+              a.playing ? 'opacity-0 group-hover:opacity-100' : 'opacity-100',
+            )}
+          >
+            {a.playing ? <Pause className="h-4 w-4" /> : <Play className="ml-0.5 h-4 w-4" />}
           </span>
         </button>
-        <button onClick={a.next} className="hidden rounded-full p-2.5 text-muted transition hover:bg-parchment hover:text-maroon sm:block" aria-label="Next chant">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="flex min-w-0 items-center gap-2.5 rounded-full py-1 pl-2.5 pr-2 text-left hover:bg-parchment/60"
+        >
+          <span className="hidden min-w-0 max-w-[180px] min-[420px]:block">
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.span
+                key={a.waiting ? 'wait' : a.track.id}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.25 }}
+                className="block"
+              >
+                <span className="block truncate text-[12.5px] font-semibold leading-tight text-ink">
+                  {a.waiting ? 'Tap anywhere for chants' : a.track.title}
+                </span>
+                <span className="block truncate font-mlsans text-[11px] leading-tight text-muted">{a.track.ml}</span>
+              </motion.span>
+            </AnimatePresence>
+          </span>
+          <Bars active={a.playing} />
+        </button>
+        <button
+          onClick={a.next}
+          className="hidden rounded-full p-2 text-muted transition hover:bg-parchment hover:text-maroon sm:block"
+          aria-label="Next chant"
+        >
           <SkipForward className="h-4 w-4" />
         </button>
-        <button onClick={() => setOpen((v) => !v)} className="rounded-full p-2.5 text-muted transition hover:bg-parchment hover:text-maroon" aria-label="All chants">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="rounded-full p-2 text-muted transition hover:bg-parchment hover:text-maroon"
+          aria-label="All chants"
+        >
           <ListMusic className="h-4 w-4" />
         </button>
       </div>

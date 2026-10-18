@@ -21,7 +21,7 @@ export function Plans() {
                 <div
                   className={cn(
                     'flex h-full flex-col rounded-[24px] border bg-white/75 p-6 transition-all duration-300 sm:p-7',
-                    active ? 'border-saffron/60 shadow-lift' : 'border-gold/15 hover:border-gold/40',
+                    active ? 'border-saffron/60 shadow-lift' : 'border-gold/15 hover:-translate-y-1 hover:border-gold/40 hover:shadow-soft',
                   )}
                 >
                   <div className="flex items-baseline justify-between gap-3">

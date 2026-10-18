@@ -60,7 +60,8 @@ export function PaymentPanel({
               Pay <span className="text-saffron">₹{amount}</span> for {planName}
             </p>
             <p className="mt-1 text-[14px] leading-relaxed text-muted">
-              Enter exactly ₹{amount} on the Razorpay page. If it asks for a note, add your code{' '}
+              Enter exactly ₹{amount} and use the same email you signed in with, so we can match the payment to you. If it asks
+              for a note, add your code{' '}
               <button
                 type="button"
                 onClick={async () => setCopied(await copyText(code))}

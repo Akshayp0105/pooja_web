@@ -14,7 +14,24 @@ const LINKS = [
   { href: '#mantras', label: 'Slokams' },
 ];
 
+/** Which section is in the middle of the screen, for the nav highlight. */
+function useActiveSection(ids: string[]) {
+  const [active, setActive] = useState<string | null>(null);
+  useEffect(() => {
+    const els = ids.map((id) => document.getElementById(id)).filter(Boolean) as HTMLElement[];
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach((e) => e.isIntersecting && setActive(e.target.id)),
+      { rootMargin: '-45% 0px -50% 0px' },
+    );
+    els.forEach((el) => io.observe(el));
+    return () => io.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return active;
+}
+
 export function Navbar({ admin = false }: { admin?: boolean }) {
+  const active = useActiveSection(['top', 'plans', 'offer', 'collect', 'ritual', 'mantras']);
   const { scrollY } = useScroll();
   const [scrolled, setScrolled] = useState(false);
   const unlocked = useUnlocked();
@@ -37,11 +54,25 @@ export function Navbar({ admin = false }: { admin?: boolean }) {
         </a>
         {!admin && (
           <div className="hidden items-center lg:flex">
-            {LINKS.map((l) => (
-              <a key={l.href} href={l.href} className="rounded-full px-4 py-2 text-[14px] font-medium text-ink/70 transition-colors hover:text-maroon">
-                {l.label}
-              </a>
-            ))}
+            {LINKS.map((l) => {
+              const on = active === l.href.slice(1);
+              return (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  className={cn('relative rounded-full px-4 py-2 text-[14px] font-medium transition-colors', on ? 'text-maroon' : 'text-ink/65 hover:text-maroon')}
+                >
+                  {on && (
+                    <motion.span
+                      layoutId="nav-active"
+                      className="absolute inset-0 rounded-full bg-[#FFF1DC]"
+                      transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+                    />
+                  )}
+                  <span className="relative">{l.label}</span>
+                </a>
+              );
+            })}
           </div>
         )}
         <div className="flex items-center gap-1.5">

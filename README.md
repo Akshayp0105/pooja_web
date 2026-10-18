@@ -31,6 +31,29 @@ art, video, voice), pay on Razorpay, and get everything back on **Vijayadashami,
    run it in the SQL Editor. Set `email_from` and `site_url` as the file explains.
 7. **Run it.** `npm install`, then `npm run dev`, or `npm run build` and deploy `dist/`.
 
+## Deploying on Vercel
+
+1. vercel.com → Add New → Project → import this folder (from GitHub, or run `npx vercel` here).
+   Framework, build command and output are already set in `vercel.json`.
+2. Project → Settings → Environment Variables: add `VITE_SUPABASE_URL` and
+   `VITE_SUPABASE_PUBLISHABLE_KEY` (values in `.env.example`). Never add the secret key.
+3. Deploy, then put the Vercel address (e.g. `https://pooja-veppu.vercel.app`) into:
+   - Supabase → Authentication → URL Configuration → Site URL and Redirect URLs
+   - `update app_settings set value = 'https://pooja-veppu.vercel.app' where key = 'site_url';`
+
+## Security
+
+- Database: row-level security on every table; all access through checked functions.
+- Limits: 10 submissions/hour and 5 unpaid at a time per account; 20 files, 50 MB each,
+  500 MB total; 5 Payment ID attempts/hour; 3 rejections per submission before support.
+- Each Payment ID can be used only once; every approve/reject is recorded in `admin_audit`.
+- Files are private; upload paths are strictly validated; reads only by the owner after unlock.
+- `vercel.json` sends a strict Content-Security-Policy, blocks framing (clickjacking), forces
+  HTTPS, and allows the microphone only for this site.
+- Optional bot protection on sign-in: create a Cloudflare Turnstile widget, put its site key in
+  `VITE_TURNSTILE_SITE_KEY` (Vercel env var), and in Supabase → Authentication → Attack
+  Protection enable CAPTCHA with provider Turnstile and its secret key.
+
 ## Approving payments
 
 Payments go to `razorpay.me/@akshayparambath`. After paying, a person pastes their Razorpay

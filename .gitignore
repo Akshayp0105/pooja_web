@@ -1,0 +1,8 @@
+node_modules
+dist
+.env
+.env*.local
+desktop.ini
+Thumbs.db
+.DS_Store
+Screenshot*.png

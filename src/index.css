@@ -1,0 +1,240 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-size: clamp(16px, 0.25vw + 12.5px, 20px);
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    @apply bg-ivory font-sans text-ink antialiased;
+    font-feature-settings: 'ss01', 'cv11';
+  }
+  ::selection {
+    background: rgba(243, 165, 58, 0.3);
+  }
+  :focus-visible {
+    outline: 2px solid #dd7420;
+    outline-offset: 3px;
+    border-radius: 12px;
+  }
+}
+
+@layer components {
+  .gutter {
+    padding-inline: clamp(16px, 4vw, 72px);
+  }
+  .section {
+    padding-block: clamp(48px, 6vw, 96px);
+  }
+  .pill-btn {
+    @apply inline-flex items-center gap-2 rounded-full border border-gold/20 bg-white/70 px-4 py-2 text-[13.5px] font-semibold text-maroon transition hover:border-gold/40 hover:bg-white;
+  }
+  .pill-btn-on {
+    @apply border-saffron/40 bg-[#FFF4E3] text-saffron;
+  }
+  .card {
+    @apply relative rounded-[28px] border border-gold/15 bg-white/70 shadow-soft backdrop-blur-xl;
+  }
+  .hairline {
+    background: linear-gradient(90deg, transparent, rgba(184, 134, 47, 0.45), transparent);
+    height: 1px;
+  }
+  .text-gilded {
+    background: linear-gradient(100deg, #8a621c 0%, #c9973f 30%, #e9c47a 50%, #b8862f 70%, #8a621c 100%);
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: gild 8s linear infinite;
+  }
+  .btn-primary {
+    @apply relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-full px-7 py-3.5 text-[15px] font-semibold text-white shadow-glow transition-all duration-300;
+    background: linear-gradient(135deg, #e8892a 0%, #dd7420 45%, #c75d17 100%);
+  }
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 16px 50px -12px rgba(221, 116, 32, 0.7);
+  }
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%);
+    transform: translateX(-120%);
+    animation: shine 4.5s ease-in-out infinite;
+  }
+  .btn-primary:disabled {
+    @apply cursor-not-allowed opacity-50 shadow-none;
+  }
+  .btn-primary:disabled::after {
+    animation: none;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-gold/25 bg-white/60 px-6 py-3.5 text-[15px] font-semibold text-maroon backdrop-blur transition-all duration-300 hover:border-gold/50 hover:bg-white;
+  }
+  .chip {
+    @apply inline-flex items-center gap-2 rounded-full border border-gold/20 bg-white/70 px-3.5 py-1.5 text-xs font-semibold tracking-wide text-gold-deep backdrop-blur;
+  }
+  .field {
+    @apply w-full rounded-2xl border border-gold/20 bg-white/80 px-4 py-3.5 text-[15px] text-ink outline-none transition-all placeholder:text-muted/60 focus:border-saffron/50 focus:bg-white focus:ring-4 focus:ring-marigold/15;
+  }
+}
+
+/* ── Backdrop textures ─────────────────────────────── */
+.bg-kolam {
+  background-image: radial-gradient(rgba(184, 134, 47, 0.28) 1px, transparent 1.2px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse at 50% 0%, #000 0%, transparent 70%);
+}
+.grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ── Keyframes ─────────────────────────────────────── */
+@keyframes gild {
+  to {
+    background-position: 200% center;
+  }
+}
+@keyframes shine {
+  0%,
+  60% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(120%);
+  }
+}
+@keyframes flicker {
+  0%,
+  100% {
+    transform: scale(1, 1) skewX(0deg);
+  }
+  25% {
+    transform: scale(0.96, 1.05) skewX(1.5deg);
+  }
+  50% {
+    transform: scale(1.03, 0.97) skewX(-1deg);
+  }
+  75% {
+    transform: scale(0.98, 1.06) skewX(-2deg);
+  }
+}
+.flame {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: flicker 2.2s ease-in-out infinite;
+}
+@keyframes glow {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translateX(-50%) scale(1.15);
+  }
+}
+.animate-glow {
+  animation: glow 3s ease-in-out infinite;
+}
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.animate-spin-slow {
+  animation: spin-slow 90s linear infinite;
+}
+.animate-spin-slower-rev {
+  animation: spin-slow 140s linear infinite reverse;
+}
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+.animate-breathe {
+  animation: breathe 6s ease-in-out infinite;
+}
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+@keyframes fall {
+  0% {
+    transform: translate3d(0, -12vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.85;
+  }
+  90% {
+    opacity: 0.85;
+  }
+  100% {
+    transform: translate3d(var(--sway, 60px), 112vh, 0) rotate(560deg);
+    opacity: 0;
+  }
+}
+.petal {
+  position: absolute;
+  top: 0;
+  animation-name: fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+@keyframes shimmer {
+  to {
+    transform: translateX(200%);
+  }
+}
+.animate-shimmer {
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+@keyframes ripple {
+  from {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+  to {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+.animate-ripple {
+  animation: ripple 2.4s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .petal {
+    display: none;
+  }
+}

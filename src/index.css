@@ -124,9 +124,9 @@
   }
 }
 .flame {
-  transform-box: fill-box;
   transform-origin: 50% 100%;
   animation: flicker 2.2s ease-in-out infinite;
+  will-change: transform;
 }
 @keyframes glow {
   0%,
@@ -149,6 +149,7 @@
 }
 .animate-spin-slow {
   animation: spin-slow 90s linear infinite;
+  will-change: transform;
 }
 .disc {
   animation: spin-slow 3.6s linear infinite;

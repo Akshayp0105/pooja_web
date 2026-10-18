@@ -20,7 +20,7 @@ const fade = (delay: number) => ({
 });
 
 export function Hero() {
-  const now = useNow();
+  const now = useNow(30_000);
   const unlocked = now >= UNLOCK_AT.getTime();
   const phase = phaseLabel(now);
   const ref = useRef<HTMLElement>(null);

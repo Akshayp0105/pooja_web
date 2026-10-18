@@ -96,7 +96,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   // first tap or key press, so fall back to starting on that gesture.
   useEffect(() => {
     const el = new Audio(TRACKS[index].src);
-    el.preload = 'auto';
+    el.preload = 'none';
     audio.current = el;
     el.addEventListener('play', () => setPlaying(true));
     el.addEventListener('pause', () => setPlaying(false));

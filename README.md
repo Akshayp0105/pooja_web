@@ -48,6 +48,14 @@ art, video, voice), pay on Razorpay, and get everything back on **Vijayadashami,
 - Database: row-level security on every table; all access through checked functions.
 - Limits: 10 submissions/hour and 5 unpaid at a time per account; 20 files, 50 MB each,
   500 MB total; 5 Payment ID attempts/hour; 3 rejections per submission before support.
+- Rate limiting: a Redis-style counter (`rate_limits`, an UNLOGGED table) guards every function:
+  10 new submissions/hour, 20 seals/hour, 10 payment attempts/hour, 60 list or open requests per
+  minute, 120 admin actions per minute. Over the limit → `RATE_LIMITED`.
+- Database protection: every browser query is cancelled after 3 s (signed out) or 8 s (signed in);
+  list functions return at most 100 (yours) or 500 (admin) rows; every lookup has an index.
+- Caching: the site keeps plans for an hour, your admin status for 5 minutes and your submissions
+  for 10 seconds (`src/lib/cache.ts`), and merges duplicate requests, so the database sees far fewer
+  reads. Signing out clears it.
 - Each Payment ID can be used only once; every approve/reject is recorded in `admin_audit`.
 - Files are private; upload paths are strictly validated; reads only by the owner after unlock.
 - `vercel.json` sends a strict Content-Security-Policy, blocks framing (clickjacking), forces

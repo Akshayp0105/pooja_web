@@ -57,24 +57,28 @@ export function Diya({ className }: { className?: string }) {
     <div className={className} aria-hidden>
       <div className="relative">
       <div className="animate-glow absolute left-1/2 top-[-30%] h-[90%] w-[90%] rounded-full bg-marigold/50 blur-2xl" />
-      <svg viewBox="0 0 80 64" className="relative w-full overflow-visible">
+      {/* The flame is its own HTML layer so the flicker runs on the GPU;
+          animating an SVG path re-lays out the page every frame. */}
+      <span className="flame absolute left-[37.5%] top-[3.1%] z-10 block h-[51.6%] w-[25%]">
+        <svg viewBox="30 2 20 33" className="block h-full w-full overflow-visible">
+          <defs>
+            <radialGradient id={`${id}-f`} cx="50%" cy="75%" r="70%">
+              <stop offset="0" stopColor="#FFFBEA" />
+              <stop offset=".35" stopColor="#FFD36B" />
+              <stop offset=".75" stopColor="#F59A2A" />
+              <stop offset="1" stopColor="#E0641C" stopOpacity=".2" />
+            </radialGradient>
+          </defs>
+          <path d="M40 2C46.5 12 50 19 50 25.5C50 31 45.5 35 40 35C34.5 35 30 31 30 25.5C30 19 33.5 12 40 2Z" fill={`url(#${id}-f)`} />
+        </svg>
+      </span>
+      <svg viewBox="0 0 80 64" className="relative block w-full overflow-visible">
         <defs>
-          <radialGradient id={`${id}-f`} cx="50%" cy="75%" r="70%">
-            <stop offset="0" stopColor="#FFFBEA" />
-            <stop offset=".35" stopColor="#FFD36B" />
-            <stop offset=".75" stopColor="#F59A2A" />
-            <stop offset="1" stopColor="#E0641C" stopOpacity=".2" />
-          </radialGradient>
           <linearGradient id={`${id}-c`} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" stopColor="#D88A4E" />
             <stop offset="1" stopColor="#9A4722" />
           </linearGradient>
         </defs>
-        <path
-          className="flame"
-          d="M40 2C46.5 12 50 19 50 25.5C50 31 45.5 35 40 35C34.5 35 30 31 30 25.5C30 19 33.5 12 40 2Z"
-          fill={`url(#${id}-f)`}
-        />
         <path d="M6 34C10 50 24 58 40 58C56 58 70 50 74 34C62 38 52 39.5 40 39.5C28 39.5 18 38 6 34Z" fill={`url(#${id}-c)`} />
         <ellipse cx="40" cy="35.5" rx="34" ry="4" fill="#EDB27A" />
         <path d="M14 44C22 50 30 52 40 52C50 52 58 50 66 44" stroke="#F2C08E" strokeOpacity=".5" strokeWidth="1" fill="none" />

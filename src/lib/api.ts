@@ -1,3 +1,4 @@
+import { cached, invalidate } from './cache';
 import { supabase } from './supabase';
 
 export type Plan = {
@@ -82,6 +83,7 @@ export type AdminStats = {
 export type UploadProgress = { index: number; count: number; current: string; doneBytes: number; totalBytes: number };
 
 const MESSAGES: [RegExp, string][] = [
+  [/RATE_LIMITED/, 'You’re going a little fast. Please wait a minute and try again.'],
   [/SUBMISSIONS_CLOSED/, 'Submissions have closed for this year. It is time for Pooja Eduppu.'],
   [/NOT_SIGNED_IN|JWT|not authenticated/i, 'Please sign in again to continue.'],
   [/INVALID_PAYMENT_ID/, 'That doesn’t look like a Razorpay Payment ID. It starts with pay_ followed by 14 letters and numbers.'],
@@ -144,10 +146,17 @@ export const FALLBACK_PLANS: Plan[] = [
   },
 ];
 
-export async function fetchPlans(): Promise<Plan[]> {
-  const { data, error } = await supabase.from('plans').select('*').order('sort');
-  if (error || !data?.length) return FALLBACK_PLANS;
-  return data as Plan[];
+export function fetchPlans(): Promise<Plan[]> {
+  return cached(
+    'plans',
+    60 * 60 * 1000,
+    async () => {
+      const { data, error } = await supabase.from('plans').select('*').order('sort');
+      if (error || !data?.length) throw error ?? new Error('no plans');
+      return data as Plan[];
+    },
+    { persist: true },
+  ).catch(() => FALLBACK_PLANS);
 }
 
 function safeName(name: string) {
@@ -182,16 +191,27 @@ export async function createAndSeal(
   }
   onProgress({ index: input.files.length, count: input.files.length, current: '', doneBytes, totalBytes });
   const ok = await rpc<boolean>('seal_submission', { p_code: code, p_files: uploaded });
+  invalidate('mine:');
   if (!ok) throw new Error('Could not seal your belongings. Please try again.');
   return code;
 }
 
 export async function submitPayment(code: string, paymentId: string) {
   const ok = await rpc<boolean>('submit_payment', { p_code: code, p_payment_id: paymentId.trim() });
+  invalidate('mine:');
   if (!ok) throw new Error('This submission is not waiting for payment.');
 }
 
-export const mySubmissions = () => rpc<MySubmission[]>('my_submissions');
+async function userKey() {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user.id ?? 'anon';
+}
+
+export const mySubmissions = async (fresh = false) => {
+  const key = `mine:${await userKey()}`;
+  if (fresh) invalidate(key);
+  return cached(key, 10_000, () => rpc<MySubmission[]>('my_submissions'));
+};
 export const openSubmission = (code: string) => rpc<OpenedSubmission | null>('open_submission', { p_code: code });
 
 export async function signedUrls(bucket: 'belongings' | 'gifts', paths: string[]): Promise<Record<string, string>> {
@@ -216,9 +236,15 @@ export async function download(bucket: 'belongings' | 'gifts', path: string, nam
   a.remove();
 }
 
-export const isAdmin = () => rpc<boolean>('is_admin');
+export const isAdmin = async () => cached(`admin:${await userKey()}`, 5 * 60_000, () => rpc<boolean>('is_admin'));
 export const adminPayments = (status: 'pending' | 'approved' | 'rejected' | 'all') =>
   rpc<AdminPayment[]>('admin_payments', { p_status: status });
 export const adminStats = () => rpc<AdminStats>('admin_stats');
 export const adminReview = (id: string, approve: boolean, note?: string) =>
   rpc<boolean>('admin_review_payment', { p_id: id, p_approve: approve, p_note: note ?? null });
+
+/** Drop every cached value tied to the signed-in user (call on sign-out). */
+export const clearUserCache = () => {
+  invalidate('mine:');
+  invalidate('admin:');
+};

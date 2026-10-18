@@ -1,6 +1,6 @@
 import type { Session } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { friendly } from './api';
+import { clearUserCache, friendly } from './api';
 import { supabase } from './supabase';
 
 export type Profile = { id: string; email: string | null; full_name: string | null; phone: string | null };
@@ -95,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     signOut: async () => {
       await supabase.auth.signOut();
+      clearUserCache();
       setProfile(null);
     },
     requireAuth: () => {

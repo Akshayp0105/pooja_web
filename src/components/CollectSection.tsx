@@ -36,10 +36,10 @@ export function CollectSection() {
   const [error, setError] = useState<string | null>(null);
   const [opened, setOpened] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (fresh = false) => {
     if (!auth.session) return setList(null);
     try {
-      setList(await mySubmissions());
+      setList(await mySubmissions(fresh));
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -53,11 +53,12 @@ export function CollectSection() {
   // Refresh when someone comes back to the tab, e.g. after paying on Razorpay.
   useEffect(() => {
     const onFocus = () => document.visibilityState === 'visible' && load();
+    const onSubmitted = () => load(true);
     document.addEventListener('visibilitychange', onFocus);
-    window.addEventListener('pv:submitted', load);
+    window.addEventListener('pv:submitted', onSubmitted);
     return () => {
       document.removeEventListener('visibilitychange', onFocus);
-      window.removeEventListener('pv:submitted', load);
+      window.removeEventListener('pv:submitted', onSubmitted);
     };
   }, [load]);
 
@@ -110,7 +111,7 @@ export function CollectSection() {
           ) : (
             <ul className="space-y-3">
               {list.map((s) => (
-                <SubmissionRow key={s.code} s={s} open={opened === s.code} onToggle={() => setOpened(opened === s.code ? null : s.code)} onChanged={load} />
+                <SubmissionRow key={s.code} s={s} open={opened === s.code} onToggle={() => setOpened(opened === s.code ? null : s.code)} onChanged={() => load(true)} />
               ))}
             </ul>
           )}

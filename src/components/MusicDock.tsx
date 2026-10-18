@@ -9,10 +9,12 @@ export function Bars({ active, className }: { active: boolean; className?: strin
   return (
     <span className={cn('flex h-4 items-end gap-[3px]', className)} aria-hidden>
       {[0.55, 1, 0.7, 0.9].map((h, i) => (
+        // scaleY (a GPU transform) instead of height, so playing never forces a re-layout
         <motion.span
           key={i}
-          className="w-[3px] rounded-full bg-gradient-to-t from-saffron to-marigold"
-          animate={active ? { height: ['30%', `${h * 100}%`, '45%', `${h * 80}%`, '30%'] } : { height: '30%' }}
+          className="h-full w-[3px] origin-bottom rounded-full bg-gradient-to-t from-saffron to-marigold"
+          initial={{ scaleY: 0.3 }}
+          animate={active ? { scaleY: [0.3, h, 0.45, h * 0.8, 0.3] } : { scaleY: 0.3 }}
           transition={active ? { duration: 1.2 + i * 0.18, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.3 }}
         />
       ))}

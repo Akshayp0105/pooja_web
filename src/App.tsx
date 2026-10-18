@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react';
-import { Admin } from './components/Admin';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { AudioProvider } from './components/AudioProvider';
 import { AuthDialog } from './components/AuthDialog';
 import { CollectSection } from './components/CollectSection';
@@ -13,6 +12,8 @@ import { Plans } from './components/Plans';
 import { Footer, Guidelines, Ritual } from './components/Ritual';
 import { AuthProvider } from './lib/auth';
 import { PlansProvider } from './lib/plans';
+
+const Admin = lazy(() => import('./components/Admin').then((m) => ({ default: m.Admin })));
 
 /** "#/admin" is a separate page; any other hash is an in-page anchor. */
 function useRoute() {
@@ -37,7 +38,9 @@ export default function App() {
             {route === 'admin' ? (
               <>
                 <Navbar admin />
-                <Admin />
+                <Suspense fallback={null}>
+                  <Admin />
+                </Suspense>
               </>
             ) : (
               <>

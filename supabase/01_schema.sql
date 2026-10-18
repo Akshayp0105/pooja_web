@@ -283,6 +283,8 @@ create table if not exists public.payments (
   created_at           timestamptz not null default now()
 );
 create index if not exists payments_status_idx on public.payments (status, created_at);
+create index if not exists payments_user_idx on public.payments (user_id, created_at desc);
+create index if not exists payments_submission_idx on public.payments (submission_id, created_at desc);
 alter table public.payments enable row level security;
 
 -- ─── Return gifts (Prasadam) ────────────────────────────────────────
@@ -362,6 +364,39 @@ create table if not exists public.notification_log (
   unique (user_id, day, channel)
 );
 alter table public.notification_log enable row level security;
+create index if not exists notification_log_day_idx on public.notification_log (day);
+
+-- ─── Rate limiting ──────────────────────────────────────────────────
+-- A Redis-style fixed-window counter. UNLOGGED skips the write-ahead log, so
+-- it is fast and cheap; its contents are disposable (a crash only resets the
+-- counters).
+create unlogged table if not exists public.rate_limits (
+  key           text primary key,
+  hits          integer not null,
+  window_start  timestamptz not null
+);
+alter table public.rate_limits enable row level security;
+
+create or replace function public.pv_rate_limit(p_key text, p_max integer, p_window interval)
+returns void language plpgsql volatile security definer
+set search_path = public as $$
+declare
+  n integer;
+begin
+  insert into rate_limits as r (key, hits, window_start)
+  values (p_key, 1, now())
+  on conflict (key) do update set
+    hits         = case when r.window_start < now() - p_window then 1 else r.hits + 1 end,
+    window_start = case when r.window_start < now() - p_window then now() else r.window_start end
+  returning hits into n;
+  if n > p_max then
+    raise exception 'RATE_LIMITED' using hint = 'Too many requests, slow down.';
+  end if;
+  -- Occasionally sweep old counters so the table stays tiny.
+  if random() < 0.005 then
+    delete from rate_limits where window_start < now() - interval '1 day';
+  end if;
+end $$;
 
 -- ─── Helpers ────────────────────────────────────────────────────────
 create or replace function public.pv_new_code()
@@ -396,6 +431,7 @@ declare
   uid uuid := pv_require_user();
   c text;
 begin
+  perform pv_rate_limit('create:' || uid, 10, interval '1 hour');
   if now() >= pv_unlock_at() then raise exception 'SUBMISSIONS_CLOSED'; end if;
   if not exists (select 1 from plans where id = p_plan and active) then raise exception 'UNKNOWN_PLAN'; end if;
   if (select count(*) from submissions where user_id = uid and created_at > now() - interval '1 hour') >= 10 then
@@ -429,6 +465,7 @@ declare
   f jsonb;
   i integer := 0;
 begin
+  perform pv_rate_limit('seal:' || pv_require_user(), 20, interval '1 hour');
   select * into s from submissions
    where code = p_code and user_id = pv_require_user() and status = 'draft'
    for update;
@@ -465,6 +502,7 @@ declare
   s submissions;
   pid text := btrim(p_payment_id);
 begin
+  perform pv_rate_limit('pay:' || pv_require_user(), 10, interval '1 hour');
   select * into s from submissions
    where code = p_code and user_id = pv_require_user()
      and status in ('awaiting_payment', 'rejected')
@@ -487,8 +525,12 @@ end $$;
 
 -- 4. Everything the signed-in user has submitted.
 create or replace function public.my_submissions()
-returns jsonb language sql stable security definer
-set search_path = public as $$
+returns jsonb language plpgsql volatile security definer
+set search_path = public
+set statement_timeout = '5s' as $$
+begin
+  perform pv_rate_limit('list:' || pv_require_user(), 60, interval '1 minute');
+  return (
   select coalesce(jsonb_agg(to_jsonb(r) order by r.created_at desc), '[]'::jsonb) from (
     select s.code, s.status, s.created_at, s.devotee_name as name,
            jsonb_build_object('id', p.id, 'name', p.name, 'name_ml', p.name_ml, 'price_inr', p.price_inr,
@@ -500,17 +542,22 @@ set search_path = public as $$
            now() >= pv_unlock_at() as unlocked
       from submissions s join plans p on p.id = s.plan_id
      where s.user_id = auth.uid() and s.status <> 'draft'
+     order by s.created_at desc
+     limit 100
   ) r
-$$;
+  );
+end $$;
 
 -- 5. Open a submission on Vijayadashami (owner only, payment confirmed).
 create or replace function public.open_submission(p_code text)
-returns jsonb language plpgsql stable security definer
-set search_path = public as $$
+returns jsonb language plpgsql volatile security definer
+set search_path = public
+set statement_timeout = '5s' as $$
 declare
   s submissions;
   p plans;
 begin
+  perform pv_rate_limit('open:' || pv_require_user(), 60, interval '1 minute');
   select * into s from submissions where code = upper(btrim(p_code)) and user_id = pv_require_user();
   if not found then return null; end if;
   select * into p from plans where id = s.plan_id;
@@ -559,10 +606,12 @@ begin
 end $$;
 
 create or replace function public.admin_payments(p_status text default 'pending')
-returns jsonb language plpgsql stable security definer
-set search_path = public as $$
+returns jsonb language plpgsql volatile security definer
+set search_path = public
+set statement_timeout = '8s' as $$
 begin
   perform pv_require_admin();
+  perform pv_rate_limit('admin:' || auth.uid(), 120, interval '1 minute');
   return coalesce((
     select jsonb_agg(to_jsonb(r) order by r.created_at) from (
       select pay.id, pay.razorpay_payment_id as payment_id, pay.amount_inr, pay.status, pay.admin_note,
@@ -575,14 +624,18 @@ begin
         join plans pl on pl.id = pay.plan_id
         left join profiles pr on pr.id = pay.user_id
        where p_status = 'all' or pay.status = p_status
+       order by pay.created_at
+       limit 500
     ) r), '[]'::jsonb);
 end $$;
 
 create or replace function public.admin_stats()
-returns jsonb language plpgsql stable security definer
-set search_path = public as $$
+returns jsonb language plpgsql volatile security definer
+set search_path = public
+set statement_timeout = '8s' as $$
 begin
   perform pv_require_admin();
+  perform pv_rate_limit('admin:' || auth.uid(), 120, interval '1 minute');
   return jsonb_build_object(
     'pending',   (select count(*) from payments where status = 'pending'),
     'confirmed', (select count(*) from submissions where status = 'confirmed'),
@@ -601,6 +654,7 @@ declare
   pay payments;
 begin
   perform pv_require_admin();
+  perform pv_rate_limit('admin:' || auth.uid(), 120, interval '1 minute');
   select * into pay from payments where id = p_id and status = 'pending' for update;
   if not found then return false; end if;
 
@@ -636,8 +690,9 @@ end $$;
 -- ─── Grants ─────────────────────────────────────────────────────────
 revoke all on public.submissions, public.submission_files, public.payments, public.blessings,
               public.return_gifts, public.daily_messages, public.notification_log,
-              public.app_admins, public.app_settings, public.admin_audit
+              public.app_admins, public.app_settings, public.admin_audit, public.rate_limits
   from anon, authenticated;
+revoke execute on function public.pv_rate_limit(text, integer, interval) from public, anon, authenticated;
 
 revoke execute on function public.pv_new_code(), public.pv_next_blessing() from public, anon, authenticated;
 grant execute on function public.create_submission(text, text, text) to authenticated;
@@ -654,6 +709,11 @@ revoke execute on function public.create_submission(text, text, text), public.se
                            public.submit_payment(text, text), public.my_submissions(), public.open_submission(text),
                            public.admin_payments(text), public.admin_stats(), public.admin_review_payment(uuid, boolean, text)
   from anon;
+
+-- ─── Query time limits ──────────────────────────────────────────────
+-- A runaway or abusive query is cancelled instead of tying up the database.
+alter role anon set statement_timeout = '3s';
+alter role authenticated set statement_timeout = '8s';
 
 -- ─── Storage ────────────────────────────────────────────────────────
 insert into storage.buckets (id, name, public, file_size_limit)

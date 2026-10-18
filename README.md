@@ -21,6 +21,8 @@ art, video, voice), pay on Razorpay, and get everything back on **Vijayadashami,
    <p>Or <a href="{{ .ConfirmationURL }}">sign in with this link</a>. The code expires in 1 hour.</p>
    ```
    Do the same for the **Confirm signup** template (new users get that one first).
+   Keep Authentication → Providers → Email → **Email OTP Length** at **8** (the site shows 8 boxes;
+   change `CODE_LENGTH` in `src/components/AuthDialog.tsx` if you change it).
 3. **Site URL.** Authentication → URL Configuration → set Site URL to your live address and add
    `http://localhost:4173` and `http://localhost:5173` to Redirect URLs.
 4. **Email sending limit.** Supabase’s built-in mailer only sends a few emails per hour. Before

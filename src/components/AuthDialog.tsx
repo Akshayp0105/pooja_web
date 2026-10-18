@@ -7,13 +7,15 @@ import { useAuth } from '../lib/auth';
 
 type Step = 'email' | 'code' | 'profile';
 
+// Must match Supabase → Authentication → Providers → Email → Email OTP Length.
+const CODE_LENGTH = 8;
+
 export function AuthDialog() {
   const auth = useAuth();
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
-  const [digits, setDigits] = useState<string[]>(Array(6).fill(''));
+  const [digits, setDigits] = useState<string[]>(Array(CODE_LENGTH).fill(''));
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resendIn, setResendIn] = useState(0);
@@ -21,24 +23,20 @@ export function AuthDialog() {
   const [captchaKey, setCaptchaKey] = useState(0);
   const boxes = useRef<(HTMLInputElement | null)[]>([]);
 
-  // Pick the right step whenever the dialog opens.
+  // Pick the starting step once, when the dialog opens. (Reacting to every
+  // session change made the name step flash up mid-sign-in.)
   useEffect(() => {
     if (!auth.dialogOpen) return;
     setError(null);
     if (auth.session && !auth.complete) {
       setStep('profile');
       setName(auth.profile?.full_name ?? '');
-      setPhone((auth.profile?.phone ?? '').replace(/^\+91/, ''));
-    } else if (!auth.session) {
+    } else {
       setStep('email');
-      setDigits(Array(6).fill(''));
+      setDigits(Array(CODE_LENGTH).fill(''));
     }
-  }, [auth.dialogOpen, auth.session, auth.complete, auth.profile]);
-
-  // A magic-link sign-in in another tab, or finishing the profile, closes the dialog.
-  useEffect(() => {
-    if (auth.dialogOpen && auth.session && auth.complete) auth.closeDialog(true);
-  }, [auth.dialogOpen, auth.session, auth.complete, auth]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.dialogOpen]);
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -71,7 +69,7 @@ export function AuthDialog() {
         setCaptchaKey((k) => k + 1);
       }
       setStep('code');
-      setDigits(Array(6).fill(''));
+      setDigits(Array(CODE_LENGTH).fill(''));
       setResendIn(45);
       setTimeout(() => boxes.current[0]?.focus(), 50);
     });
@@ -79,33 +77,38 @@ export function AuthDialog() {
 
   const verify = (code: string) =>
     run(async () => {
-      await auth.verifyCode(email, code);
-      setStep('profile');
+      const p = await auth.verifyCode(email, code);
+      if (p?.full_name?.trim()) auth.closeDialog(true);
+      else {
+        setName('');
+        setStep('profile');
+      }
     });
 
   const setDigit = (i: number, v: string) => {
     const clean = v.replace(/\D/g, '');
     if (clean.length > 1) {
-      const next = clean.slice(0, 6).split('');
-      const filled = [...next, ...Array(6 - next.length).fill('')];
+      const next = clean.slice(0, CODE_LENGTH).split('');
+      const filled = [...next, ...Array(CODE_LENGTH - next.length).fill('')];
       setDigits(filled);
-      boxes.current[Math.min(next.length, 5)]?.focus();
-      if (next.length === 6) verify(next.join(''));
+      boxes.current[Math.min(next.length, CODE_LENGTH - 1)]?.focus();
+      if (next.length === CODE_LENGTH) verify(next.join(''));
       return;
     }
     const next = [...digits];
     next[i] = clean;
     setDigits(next);
-    if (clean && i < 5) boxes.current[i + 1]?.focus();
+    if (clean && i < CODE_LENGTH - 1) boxes.current[i + 1]?.focus();
     if (next.every(Boolean)) verify(next.join(''));
   };
 
   const saveProfile = (e: FormEvent) => {
     e.preventDefault();
-    const local = phone.replace(/\D/g, '');
     if (name.trim().length < 2) return setError('Enter your name.');
-    if (!/^[6-9]\d{9}$/.test(local) && !/^\d{11,15}$/.test(local)) return setError('Enter a valid 10-digit mobile number.');
-    run(() => auth.saveProfile({ full_name: name, phone: local.length === 10 ? `+91${local}` : `+${local}` }));
+    run(async () => {
+      await auth.saveProfile({ full_name: name });
+      auth.closeDialog(true);
+    });
   };
 
   return (
@@ -144,7 +147,7 @@ export function AuthDialog() {
             {step === 'email' && (
               <form onSubmit={sendCode} className="mt-4">
                 <h2 id="auth-title" className="font-display text-[30px] leading-tight text-maroon">Sign in</h2>
-                <p className="mt-1.5 text-[14.5px] text-muted">We’ll email you a 6-digit code. No password needed.</p>
+                <p className="mt-1.5 text-[14.5px] text-muted">We’ll email you a sign-in code. No password needed.</p>
                 <label className="mt-6 block text-[13px] font-semibold text-ink/80" htmlFor="auth-email">Email</label>
                 <input
                   id="auth-email"
@@ -170,7 +173,7 @@ export function AuthDialog() {
                 <p className="mt-1.5 text-[14.5px] text-muted">
                   Sent to <span className="font-semibold text-ink">{email}</span>. Check spam if it isn’t there in a minute.
                 </p>
-                <div className="mt-6 flex justify-between gap-2">
+                <div className="mt-6 flex justify-between gap-1.5 sm:gap-2">
                   {digits.map((d, i) => (
                     <input
                       key={i}
@@ -180,9 +183,9 @@ export function AuthDialog() {
                       onKeyDown={(e) => e.key === 'Backspace' && !d && i > 0 && boxes.current[i - 1]?.focus()}
                       inputMode="numeric"
                       autoComplete={i === 0 ? 'one-time-code' : 'off'}
-                      maxLength={6}
+                      maxLength={CODE_LENGTH}
                       aria-label={`Digit ${i + 1}`}
-                      className="h-14 w-full min-w-0 rounded-2xl border border-gold/25 bg-white text-center font-display text-[26px] font-semibold text-maroon outline-none transition focus:border-saffron focus:ring-4 focus:ring-marigold/15"
+                      className="h-12 w-full min-w-0 rounded-xl border border-gold/25 bg-white text-center font-display text-[22px] sm:h-14 sm:text-[24px] font-semibold text-maroon outline-none transition focus:border-saffron focus:ring-4 focus:ring-marigold/15"
                     />
                   ))}
                 </div>
@@ -207,23 +210,10 @@ export function AuthDialog() {
 
             {step === 'profile' && (
               <form onSubmit={saveProfile} className="mt-4">
-                <h2 id="auth-title" className="font-display text-[30px] leading-tight text-maroon">A little about you</h2>
-                <p className="mt-1.5 text-[14.5px] text-muted">So we can reach you about your payment and your belongings.</p>
-                <label className="mt-6 block text-[13px] font-semibold text-ink/80" htmlFor="auth-name">Full name</label>
-                <input id="auth-name" className="field mt-2" value={name} maxLength={80} autoComplete="name" onChange={(e) => setName(e.target.value)} />
-                <label className="mt-4 block text-[13px] font-semibold text-ink/80" htmlFor="auth-phone">Mobile number</label>
-                <div className="mt-2 flex">
-                  <span className="flex items-center rounded-l-2xl border border-r-0 border-gold/20 bg-parchment px-3.5 text-[15px] text-muted">+91</span>
-                  <input
-                    id="auth-phone"
-                    className="field !rounded-l-none"
-                    value={phone}
-                    inputMode="tel"
-                    autoComplete="tel-national"
-                    onChange={(e) => setPhone(e.target.value.replace(/[^\d]/g, '').slice(0, 15))}
-                    placeholder="98765 43210"
-                  />
-                </div>
+                <h2 id="auth-title" className="font-display text-[30px] leading-tight text-maroon">Welcome</h2>
+                <p className="mt-1.5 text-[14.5px] text-muted">What should we call you? Your name appears with your blessing.</p>
+                <label className="mt-6 block text-[13px] font-semibold text-ink/80" htmlFor="auth-name">Your name</label>
+                <input id="auth-name" autoFocus className="field mt-2" value={name} maxLength={80} autoComplete="name" onChange={(e) => setName(e.target.value)} />
                 <button type="submit" disabled={busy} className="btn-primary mt-6 w-full">
                   {busy && <Loader2 className="h-4 w-4 animate-spin" />} Continue
                 </button>

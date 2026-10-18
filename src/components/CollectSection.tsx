@@ -83,7 +83,7 @@ export function CollectSection() {
             <div className="card flex flex-col items-start gap-5 p-6 sm:flex-row sm:items-center sm:justify-between sm:p-8">
               <div>
                 <h3 className="font-display text-[26px] leading-tight text-maroon">Sign in to see your belongings</h3>
-                <p className="mt-1 text-[14.5px] text-muted">Use the email you submitted with. We’ll send a 6-digit code.</p>
+                <p className="mt-1 text-[14.5px] text-muted">Use the email you submitted with. We’ll email you a sign-in code.</p>
               </div>
               <button type="button" onClick={() => auth.requireAuth()} className="btn-primary shrink-0">
                 Sign in

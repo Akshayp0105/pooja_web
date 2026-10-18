@@ -9,11 +9,12 @@ type AuthApi = {
   ready: boolean;
   session: Session | null;
   profile: Profile | null;
-  /** True once the user has a name and phone on file. */
+  /** True once the user has a name on file. */
   complete: boolean;
   sendCode: (email: string, captchaToken?: string) => Promise<void>;
-  verifyCode: (email: string, code: string) => Promise<void>;
-  saveProfile: (p: { full_name: string; phone: string }) => Promise<void>;
+  /** Signs in and returns the loaded profile, so the caller knows whether a name is still needed. */
+  verifyCode: (email: string, code: string) => Promise<Profile | null>;
+  saveProfile: (p: { full_name: string }) => Promise<void>;
   signOut: () => Promise<void>;
   /** Opens the sign-in dialog; resolves true once signed in with a complete profile. */
   requireAuth: () => Promise<boolean>;
@@ -37,10 +38,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const loadProfile = useCallback(async (s: Session | null) => {
-    if (!s) return setProfile(null);
+  const loadProfile = useCallback(async (s: Session | null): Promise<Profile | null> => {
+    if (!s) {
+      setProfile(null);
+      return null;
+    }
     const { data } = await supabase.from('profiles').select('id, email, full_name, phone').eq('id', s.user.id).maybeSingle();
-    setProfile((data as Profile) ?? { id: s.user.id, email: s.user.email ?? null, full_name: null, phone: null });
+    const p = (data as Profile) ?? { id: s.user.id, email: s.user.email ?? null, full_name: null, phone: null };
+    setProfile(p);
+    return p;
   }, []);
 
   useEffect(() => {
@@ -51,12 +57,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     const { data } = supabase.auth.onAuthStateChange((_e, s) => {
       setSession(s);
-      loadProfile(s);
+      // Calling Supabase inside this callback can deadlock the client; defer it.
+      setTimeout(() => loadProfile(s), 0);
     });
     return () => data.subscription.unsubscribe();
   }, [loadProfile]);
 
-  const complete = !!(profile?.full_name && profile?.phone);
+  const complete = !!profile?.full_name?.trim();
 
   const api: AuthApi = {
     ready,
@@ -76,13 +83,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     verifyCode: async (email, code) => {
       const { data, error } = await supabase.auth.verifyOtp({ email: email.trim().toLowerCase(), token: code, type: 'email' });
       if (error) throw new Error(/expired|invalid/i.test(error.message) ? 'That code is wrong or has expired. Request a new one.' : friendly(error));
+      const p = await loadProfile(data.session);
       setSession(data.session);
-      await loadProfile(data.session);
+      return p;
     },
-    saveProfile: async ({ full_name, phone }) => {
+    saveProfile: async ({ full_name }) => {
       if (!session) throw new Error('Please sign in again.');
-      const { error } = await supabase.from('profiles').update({ full_name: full_name.trim(), phone }).eq('id', session.user.id);
-      if (error) throw new Error(/phone/i.test(error.message) ? 'Enter a valid mobile number.' : friendly(error));
+      const { error } = await supabase.from('profiles').update({ full_name: full_name.trim() }).eq('id', session.user.id);
+      if (error) throw new Error(friendly(error));
       await loadProfile(session);
     },
     signOut: async () => {

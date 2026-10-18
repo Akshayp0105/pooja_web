@@ -15,6 +15,15 @@ const DAYS = [
     d: 'Books, pens, instruments and tools are cleaned and placed on a decorated peedham facing East or North.',
   },
   {
+    iso: '2026-10-19',
+    date: '19',
+    dow: 'Mon',
+    ml: 'പൂജ തുടരുന്നു',
+    t: 'Saraswati Pooja',
+    when: 'Morning and evening pooja at the peedham',
+    d: 'The books stay on the peedham. Light the nilavilakku at dawn and dusk, offer flowers and naivedyam, and chant Saraswati slokams together.',
+  },
+  {
     iso: '2026-10-20',
     date: '20',
     dow: 'Tue',

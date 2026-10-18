@@ -182,6 +182,10 @@ begin
   if (select count(*) from submissions where user_id = uid and created_at > now() - interval '1 hour') >= 10 then
     raise exception 'TOO_MANY_SUBMISSIONS';
   end if;
+  -- Stop one account from piling up unpaid uploads.
+  if (select count(*) from submissions where user_id = uid and status in ('draft', 'awaiting_payment', 'rejected')) >= 5 then
+    raise exception 'TOO_MANY_UNPAID';
+  end if;
   loop
     c := pv_new_code();
     begin
@@ -214,6 +218,9 @@ begin
     raise exception 'INVALID_FILES';
   end if;
   if jsonb_array_length(p_files) = 0 and s.note is null then raise exception 'EMPTY_SUBMISSION'; end if;
+  if (select coalesce(sum((f ->> 'size')::bigint), 0) from jsonb_array_elements(p_files) f) > 500 * 1024 * 1024 then
+    raise exception 'TOO_LARGE';
+  end if;
 
   for f in select * from jsonb_array_elements(p_files) loop
     if left(f ->> 'path', length(s.code) + 1) <> s.code || '/' then raise exception 'INVALID_FILES'; end if;
@@ -244,6 +251,12 @@ begin
      and status in ('awaiting_payment', 'rejected')
    for update;
   if not found then return false; end if;
+  if (select count(*) from payments where user_id = s.user_id and created_at > now() - interval '1 hour') >= 5 then
+    raise exception 'TOO_MANY_ATTEMPTS';
+  end if;
+  if (select count(*) from payments where submission_id = s.id and status = 'rejected') >= 3 then
+    raise exception 'CONTACT_SUPPORT';
+  end if;
   if pid !~ '^pay_[A-Za-z0-9]{14}$' then raise exception 'INVALID_PAYMENT_ID'; end if;
   if exists (select 1 from payments where razorpay_payment_id = pid) then raise exception 'PAYMENT_ID_USED'; end if;
 
@@ -306,6 +319,17 @@ begin
              else '[]'::jsonb end
   );
 end $$;
+
+-- ─── Admin audit log ────────────────────────────────────────────────
+create table if not exists public.admin_audit (
+  id          bigserial primary key,
+  admin_email text not null,
+  action      text not null,
+  payment_id  uuid,
+  details     jsonb,
+  created_at  timestamptz not null default now()
+);
+alter table public.admin_audit enable row level security;
 
 -- ─── Admin functions ────────────────────────────────────────────────
 create or replace function public.pv_require_admin()
@@ -373,6 +397,10 @@ begin
          confirmed_at = case when p_approve then now() else null end
    where id = pay.submission_id;
 
+  insert into admin_audit (admin_email, action, payment_id, details)
+  values (auth.jwt() ->> 'email', case when p_approve then 'approve' else 'reject' end, p_id,
+          jsonb_build_object('razorpay_payment_id', pay.razorpay_payment_id, 'amount_inr', pay.amount_inr, 'note', p_note));
+
   -- A new Anugraham member gets today's message right away (if the daily
   -- email job is installed; see supabase/02_daily_email.sql).
   if p_approve and exists (select 1 from plans where id = pay.plan_id and includes_daily)
@@ -389,7 +417,7 @@ end $$;
 -- ─── Grants ─────────────────────────────────────────────────────────
 revoke all on public.submissions, public.submission_files, public.payments, public.blessings,
               public.return_gifts, public.daily_messages, public.notification_log,
-              public.app_admins, public.app_settings
+              public.app_admins, public.app_settings, public.admin_audit
   from anon, authenticated;
 
 revoke execute on function public.pv_new_code(), public.pv_next_blessing() from public, anon, authenticated;
@@ -418,13 +446,17 @@ on conflict (id) do update set public = false, file_size_limit = excluded.file_s
 create or replace function public.pv_can_upload(p_path text)
 returns boolean language sql stable security definer
 set search_path = public as $$
-  select now() < pv_unlock_at() and exists (
-    select 1 from submissions s
-     where s.code = split_part(p_path, '/', 1)
-       and s.user_id = auth.uid()
-       and s.status = 'draft'
-       and s.created_at > now() - interval '6 hours'
-  )
+  select now() < pv_unlock_at()
+     and p_path ~ '^PV-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}-[2-9A-HJ-NP-Z]{4}/[0-9]{2}-[A-Za-z0-9._-]{1,80}$'
+     and exists (
+       select 1 from submissions s
+        where s.code = split_part(p_path, '/', 1)
+          and s.user_id = auth.uid()
+          and s.status = 'draft'
+          and s.created_at > now() - interval '6 hours'
+     )
+     and (select count(*) from storage.objects o
+           where o.bucket_id = 'belongings' and o.name like split_part(p_path, '/', 1) || '/%') < 20
 $$;
 
 -- Read: only your own confirmed submission, and only from Vijayadashami.

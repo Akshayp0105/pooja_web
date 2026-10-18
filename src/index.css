@@ -27,7 +27,7 @@
     padding-inline: clamp(16px, 4vw, 72px);
   }
   .section {
-    padding-block: clamp(48px, 6vw, 96px);
+    padding-block: clamp(40px, 4.5vw, 76px);
   }
   .pill-btn {
     @apply inline-flex items-center gap-2 rounded-full border border-gold/20 bg-white/70 px-4 py-2 text-[13.5px] font-semibold text-maroon transition hover:border-gold/40 hover:bg-white;

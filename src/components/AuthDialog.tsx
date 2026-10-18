@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ArrowLeft, Loader2, X } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Lotus } from './ornaments';
+import { TURNSTILE_SITE_KEY, Turnstile } from './Turnstile';
 import { useAuth } from '../lib/auth';
 
 type Step = 'email' | 'code' | 'profile';
@@ -16,6 +17,8 @@ export function AuthDialog() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resendIn, setResendIn] = useState(0);
+  const [captcha, setCaptcha] = useState<string | null>(null);
+  const [captchaKey, setCaptchaKey] = useState(0);
   const boxes = useRef<(HTMLInputElement | null)[]>([]);
 
   // Pick the right step whenever the dialog opens.
@@ -58,8 +61,15 @@ export function AuthDialog() {
   const sendCode = (e?: FormEvent) => {
     e?.preventDefault();
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) return setError('Enter a valid email address.');
+    if (TURNSTILE_SITE_KEY && !captcha) return setError('Please complete the human check.');
     run(async () => {
-      await auth.sendCode(email);
+      try {
+        await auth.sendCode(email, captcha ?? undefined);
+      } finally {
+        // Turnstile tokens work once; get a fresh one for any retry.
+        setCaptcha(null);
+        setCaptchaKey((k) => k + 1);
+      }
       setStep('code');
       setDigits(Array(6).fill(''));
       setResendIn(45);
@@ -147,6 +157,7 @@ export function AuthDialog() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
                 />
+                <Turnstile key={captchaKey} onToken={setCaptcha} />
                 <button type="submit" disabled={busy} className="btn-primary mt-5 w-full">
                   {busy && <Loader2 className="h-4 w-4 animate-spin" />} Send code
                 </button>
@@ -184,7 +195,7 @@ export function AuthDialog() {
                     <span />
                   )}
                   <button
-                    onClick={() => sendCode()}
+                    onClick={() => (TURNSTILE_SITE_KEY ? setStep('email') : sendCode())}
                     disabled={resendIn > 0 || busy}
                     className="font-semibold text-saffron disabled:font-normal disabled:text-muted"
                   >

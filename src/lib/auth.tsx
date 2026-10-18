@@ -11,7 +11,7 @@ type AuthApi = {
   profile: Profile | null;
   /** True once the user has a name and phone on file. */
   complete: boolean;
-  sendCode: (email: string) => Promise<void>;
+  sendCode: (email: string, captchaToken?: string) => Promise<void>;
   verifyCode: (email: string, code: string) => Promise<void>;
   saveProfile: (p: { full_name: string; phone: string }) => Promise<void>;
   signOut: () => Promise<void>;
@@ -63,10 +63,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session,
     profile,
     complete,
-    sendCode: async (email) => {
+    sendCode: async (email, captchaToken) => {
       const { error } = await supabase.auth.signInWithOtp({
         email: email.trim().toLowerCase(),
-        options: { shouldCreateUser: true, emailRedirectTo: location.origin + location.pathname },
+        options: { shouldCreateUser: true, emailRedirectTo: location.origin + location.pathname, captchaToken },
       });
       if (error) {
         if (/rate limit|security purposes/i.test(error.message)) throw new Error('Too many codes requested. Please wait a minute and try again.');

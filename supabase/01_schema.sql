@@ -433,7 +433,7 @@ begin
     raise exception 'INVALID_FILES';
   end if;
   if jsonb_array_length(p_files) = 0 and s.note is null then raise exception 'EMPTY_SUBMISSION'; end if;
-  if (select coalesce(sum((f ->> 'size')::bigint), 0) from jsonb_array_elements(p_files) f) > 500 * 1024 * 1024 then
+  if (select coalesce(sum((e ->> 'size')::bigint), 0) from jsonb_array_elements(p_files) e) > 500 * 1024 * 1024 then
     raise exception 'TOO_LARGE';
   end if;
 
